@@ -10,17 +10,23 @@
 #define MAIN_HEADER
 
 #ifdef TESTING
-#define AP_CONNECTION_STATUS_LED_PIN         GPIO_NUM_13
-#define SERVER_AVAILABILITY_STATUS_LED_PIN   GPIO_NUM_2
-#define BUZZER_PIN                           GPIO_NUM_4
-#define MOTION_DETECTOR_ENABLE_PIN           GPIO_NUM_14
-#define MOTION_DETECTOR_INPUT_PIN            GPIO_NUM_12
+#define AP_CONNECTION_STATUS_LED_PIN         GPIO_NUM_5
+#define SERVER_AVAILABILITY_STATUS_LED_PIN   GPIO_NUM_4
+
+#define MOTION_DETECTOR_ENABLE_PIN           GPIO_NUM_0
+
+#define ALARM_SOURCE_1_PIN                   GPIO_NUM_12
+#define ALARM_SOURCE_2_PIN                   GPIO_NUM_13
+#define ALARM_SOURCE_3_PIN                   GPIO_NUM_14
 #else
 #define AP_CONNECTION_STATUS_LED_PIN         GPIO_NUM_5
 #define SERVER_AVAILABILITY_STATUS_LED_PIN   GPIO_NUM_4
-#define BUZZER_PIN                           GPIO_NUM_12
-#define MOTION_DETECTOR_ENABLE_PIN           GPIO_NUM_14
-#define MOTION_DETECTOR_INPUT_PIN            GPIO_NUM_2
+
+#define MOTION_DETECTOR_ENABLE_PIN           GPIO_NUM_9
+
+#define ALARM_SOURCE_1_PIN                   GPIO_NUM_12
+#define ALARM_SOURCE_2_PIN                   GPIO_NUM_13
+#define ALARM_SOURCE_3_PIN                   GPIO_NUM_14
 #endif
 
 #define ERRORS_CHECKER_INTERVAL_MS (10 * 1000)
@@ -88,7 +94,6 @@ const char MANUALLY_IGNORE_ALARMS[] = "\"ignoreAlarms\":true";
 
 static void stop_both_leds_blinking();
 static void start_both_leds_blinking(unsigned int ms);
-static void beep();
 static void stop_motion_detector_ignoring_cb();
 
 #endif

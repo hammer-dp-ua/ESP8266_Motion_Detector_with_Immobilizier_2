@@ -315,10 +315,11 @@ static void send_status_info_task() {
    vTaskDelete(NULL);
 }
 
-static void send_alarm_task() {
-   save_motion_detector_is_being_ignored_event();
+static void send_alarm_task(void *arg) {
+   EventBits_t event = (EventBits_t) arg;
+
+   //save_motion_detector_is_being_ignored_event();
    printf("\nInterrupts counter: %u\n", interrupts_counter_g);
-   beep();
 
    for (;;) {
       if (!is_connected_to_wifi()) {
@@ -333,7 +334,7 @@ static void send_alarm_task() {
       xSemaphoreTake(wirelessNetworkActionsSemaphore_g, portMAX_DELAY);
       blink_on_send(SERVER_AVAILABILITY_STATUS_LED_PIN);
 
-      const char *request_template_parameters[] = {ALARM_SOURCE, DEVICE_NAME, SERVER_IP_ADDRESS, NULL};
+      const char *request_template_parameters[] = {ALARM_SOURCE_1, DEVICE_NAME, SERVER_IP_ADDRESS, NULL};
       char *request = set_string_parameters(ALARM_GET_REQUEST_TEMPLATE, request_template_parameters);
 
       #ifdef ALLOW_USE_PRINTF
@@ -376,21 +377,15 @@ static void send_alarm_task() {
       }
    }
 
-   ESP_ERROR_CHECK(esp_timer_stop(stop_motion_detector_ignoring_timer_g))
-   ESP_ERROR_CHECK(esp_timer_start_once(stop_motion_detector_ignoring_timer_g, MOTION_DETECTOR_IGNORING_TIMEOUT_MS * 1000))
+   //ESP_ERROR_CHECK(esp_timer_stop(stop_motion_detector_ignoring_timer_g))
+   //ESP_ERROR_CHECK(esp_timer_start_once(stop_motion_detector_ignoring_timer_g, MOTION_DETECTOR_IGNORING_TIMEOUT_MS * 1000))
 
    #ifdef ALLOW_USE_PRINTF
    printf("send_alarm_task to be deleted. Time: %u\n", hundred_milliseconds_counter_g);
    #endif
 
-   clear_sending_alarm_event();
+   clear_sending_alarm_event(event);
    vTaskDelete(NULL);
-}
-
-static void beep() {
-   gpio_set_level(BUZZER_PIN, 1);
-   vTaskDelay(80 / portTICK_PERIOD_MS);
-   gpio_set_level(BUZZER_PIN, 0);
 }
 
 static void stop_motion_detector_ignoring_cb() {
@@ -426,25 +421,26 @@ static void pins_config() {
    gpio_config_t output_pins;
    output_pins.mode = GPIO_MODE_OUTPUT;
    output_pins.pin_bit_mask = (1<<AP_CONNECTION_STATUS_LED_PIN) | (1<<SERVER_AVAILABILITY_STATUS_LED_PIN) |
-         (1<<BUZZER_PIN) | (1<<MOTION_DETECTOR_ENABLE_PIN);
+         (1<<MOTION_DETECTOR_ENABLE_PIN);
    output_pins.pull_up_en = GPIO_PULLUP_DISABLE;
    output_pins.pull_down_en = GPIO_PULLDOWN_DISABLE;
    ESP_ERROR_CHECK(gpio_config(&output_pins))
    gpio_set_level(AP_CONNECTION_STATUS_LED_PIN, 0);
    gpio_set_level(SERVER_AVAILABILITY_STATUS_LED_PIN, 0);
-   gpio_set_level(BUZZER_PIN, 0);
    gpio_set_level(MOTION_DETECTOR_ENABLE_PIN, 0);
 
    gpio_config_t input_pins;
    input_pins.mode = GPIO_MODE_INPUT;
-   input_pins.pin_bit_mask = (1<<MOTION_DETECTOR_INPUT_PIN);
+   input_pins.pin_bit_mask = (1<<ALARM_SOURCE_1_PIN) | (1<<ALARM_SOURCE_2_PIN) | (1<<ALARM_SOURCE_3_PIN);
    input_pins.pull_up_en = GPIO_PULLUP_ENABLE;
    input_pins.intr_type = GPIO_INTR_NEGEDGE;
    ESP_ERROR_CHECK(gpio_config(&input_pins))
 }
 
 static void resume_pins_interrupts_cb() {
-   ESP_ERROR_CHECK(gpio_set_intr_type(MOTION_DETECTOR_INPUT_PIN, GPIO_INTR_NEGEDGE))
+   ESP_ERROR_CHECK(gpio_set_intr_type(ALARM_SOURCE_1_PIN, GPIO_INTR_NEGEDGE))
+   ESP_ERROR_CHECK(gpio_set_intr_type(ALARM_SOURCE_2_PIN, GPIO_INTR_NEGEDGE))
+   ESP_ERROR_CHECK(gpio_set_intr_type(ALARM_SOURCE_3_PIN, GPIO_INTR_NEGEDGE))
 
    #ifdef ALLOW_USE_PRINTF
    printf("\nPins interrupts resumed. Time: %u\n", hundred_milliseconds_counter_g);
@@ -452,12 +448,29 @@ static void resume_pins_interrupts_cb() {
 }
 
 static void gpio_isr_handler(void *arg) {
+   gpio_num_t pin = (gpio_num_t) arg;
+
    if (was_pin_interrupt_initialized()) {
-      ESP_ERROR_CHECK(gpio_set_intr_type(MOTION_DETECTOR_INPUT_PIN, GPIO_INTR_DISABLE))
-      ESP_ERROR_CHECK(esp_timer_start_once(anti_contact_bounce_timer_g, 5000 * 1000)) // resume interrupts after 5000 ms
+      ESP_ERROR_CHECK(gpio_set_intr_type(pin, GPIO_INTR_DISABLE))
+      ESP_ERROR_CHECK(esp_timer_start_once(anti_contact_bounce_timer_g, 1000 * 1000)) // resume interrupts after 1000 ms
 
       interrupts_counter_g++;
-      unsigned int event = SEND_ALARM_EVENT;
+      unsigned int event;
+
+      switch (pin) {
+         case ALARM_SOURCE_1_PIN:
+            event = SEND_ALARM_1_EVENT;
+            break;
+         case ALARM_SOURCE_2_PIN:
+            event = SEND_ALARM_2_EVENT;
+            break;
+         case ALARM_SOURCE_3_PIN:
+            event = SEND_ALARM_3_EVENT;
+            break;
+         default:
+            event = 0xFF;
+      }
+
       xQueueSendToBackFromISR(network_events_queue_g, &event, NULL);
    } else {
       save_pin_interrupt_was_initialized_event();
@@ -470,11 +483,16 @@ static void pins_isr_config() {
    };
    ESP_ERROR_CHECK(esp_timer_create(&timer_config, &anti_contact_bounce_timer_g))
 
-   // change GPIO interrupt type for one pin
-   ESP_ERROR_CHECK(gpio_set_intr_type(MOTION_DETECTOR_INPUT_PIN, GPIO_INTR_NEGEDGE))
+   ESP_ERROR_CHECK(gpio_set_intr_type(ALARM_SOURCE_1_PIN, GPIO_INTR_NEGEDGE))
+   ESP_ERROR_CHECK(gpio_set_intr_type(ALARM_SOURCE_2_PIN, GPIO_INTR_NEGEDGE))
+   ESP_ERROR_CHECK(gpio_set_intr_type(ALARM_SOURCE_3_PIN, GPIO_INTR_NEGEDGE))
+
    ESP_ERROR_CHECK(gpio_install_isr_service(0))
+
    // The handler will be invoked immediately after added
-   ESP_ERROR_CHECK(gpio_isr_handler_add(MOTION_DETECTOR_INPUT_PIN, gpio_isr_handler, NULL))
+   ESP_ERROR_CHECK(gpio_isr_handler_add(ALARM_SOURCE_1_PIN, gpio_isr_handler, ALARM_SOURCE_1_PIN))
+   ESP_ERROR_CHECK(gpio_isr_handler_add(ALARM_SOURCE_2_PIN, gpio_isr_handler, ALARM_SOURCE_2_PIN))
+   ESP_ERROR_CHECK(gpio_isr_handler_add(ALARM_SOURCE_3_PIN, gpio_isr_handler, ALARM_SOURCE_3_PIN))
 }
 
 static void on_wifi_connected() {
@@ -578,12 +596,12 @@ static void event_processing_task() {
 
             save_sending_status_info_event();
             xTaskCreate(send_status_info_task, SEND_STATUS_INFO_TASK_NAME, configMINIMAL_STACK_SIZE * 3, NULL, 1, NULL);
-         } else if (event == SEND_ALARM_EVENT) {
-            if (is_alarm_being_sent() || is_manually_ignored_alarms() || is_motion_detector_being_ignored()) {
+         } else if (event == SEND_ALARM_1_EVENT || event == SEND_ALARM_2_EVENT || event == SEND_ALARM_3_EVENT) {
+            if (is_alarm_being_sent(event) || is_manually_ignored_alarms() || is_motion_detector_being_ignored()) {
                #ifdef ALLOW_USE_PRINTF
                printf("\nCan't send alarm, because: ");
 
-               if (is_alarm_being_sent()) {
+               if (is_alarm_being_sent(event)) {
                   printf("already being sent\n");
                }
                if (is_manually_ignored_alarms()) {
@@ -597,8 +615,8 @@ static void event_processing_task() {
                continue;
             }
 
-            save_sending_alarm_event();
-            xTaskCreate(send_alarm_task, "alarm_task", configMINIMAL_STACK_SIZE * 3, NULL, 1, NULL);
+            save_sending_alarm_event(event);
+            xTaskCreate(send_alarm_task, "alarm_task", configMINIMAL_STACK_SIZE * 3, event, 1, NULL);
          } else if (event == SCAN_ACCESS_POINT_EVENT) {
             if (is_access_point_is_being_scanned()) {
                continue;
@@ -635,7 +653,7 @@ void app_main(void) {
    gpio_set_level(MOTION_DETECTOR_ENABLE_PIN, 1);
    vTaskDelay(1000 / portTICK_PERIOD_MS);
    pins_isr_config();
-   init_stopping_motion_detector_ignoring_timer();
+   //init_stopping_motion_detector_ignoring_timer();
 
    wirelessNetworkActionsSemaphore_g = xSemaphoreCreateBinary();
    xSemaphoreGive(wirelessNetworkActionsSemaphore_g);

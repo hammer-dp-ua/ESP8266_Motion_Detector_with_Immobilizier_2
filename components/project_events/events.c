@@ -72,16 +72,16 @@ bool is_manually_ignored_alarms() {
    return xEventGroupGetBits(flags_g) & MANUALLY_IGNORE_ALARMS_FLAG;
 }
 
-void save_sending_alarm_event() {
-   xEventGroupSetBits(flags_g, ALARM_IS_BEING_SENT_FLAG);
+void save_sending_alarm_event(const EventBits_t uxBitsToSet) {
+   xEventGroupSetBits(flags_g, uxBitsToSet);
 }
 
-void clear_sending_alarm_event() {
-   xEventGroupClearBits(flags_g, ALARM_IS_BEING_SENT_FLAG);
+void clear_sending_alarm_event(const EventBits_t uxBitsToSet) {
+   xEventGroupClearBits(flags_g, uxBitsToSet);
 }
 
-bool is_alarm_being_sent() {
-   return xEventGroupGetBits(flags_g) & ALARM_IS_BEING_SENT_FLAG;
+bool is_alarm_being_sent(const EventBits_t uxBitsToSet) {
+   return xEventGroupGetBits(flags_g) & uxBitsToSet;
 }
 
 void save_access_point_scanning_event() {
