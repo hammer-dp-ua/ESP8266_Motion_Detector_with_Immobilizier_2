@@ -2,8 +2,8 @@
 #define DEVICE_SETTINGS
 
 // Only 1 is required
-//#define MOTION_SENSOR_WITH_IMMOBILIZER
-#define TESTING
+#define MOTION_SENSOR_WITH_IMMOBILIZER
+//#define TESTING
 
 // const are saved at 40200000h (flash memory)
 #ifdef TESTING

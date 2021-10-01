@@ -2,7 +2,10 @@
  * Required connections:
  * GPIO15 to GND
  * GPIO0 to "+" or to "GND" for flashing
+ * GPIO1 pin is high on BOOT, boot failure if pulled LOW
+ * GPIO2 pin is high on BOOT, boot failure if pulled LOW
  * EN to "+"
+ * Pins GPIO6-11 are connected to FLASH. GPIO9 and GPIO10 can be used after a hardware modification.
  */
 
 #include "main.h"
@@ -334,7 +337,22 @@ static void send_alarm_task(void *arg) {
       xSemaphoreTake(wirelessNetworkActionsSemaphore_g, portMAX_DELAY);
       blink_on_send(SERVER_AVAILABILITY_STATUS_LED_PIN);
 
-      const char *request_template_parameters[] = {ALARM_SOURCE_1, DEVICE_NAME, SERVER_IP_ADDRESS, NULL};
+      const char *alarm_source;
+      switch (event) {
+         case SEND_ALARM_1_EVENT:
+            alarm_source = ALARM_SOURCE_1;
+            break;
+         case SEND_ALARM_2_EVENT:
+            alarm_source = ALARM_SOURCE_2;
+            break;
+         case SEND_ALARM_3_EVENT:
+            alarm_source = ALARM_SOURCE_3;
+            break;
+         default:
+            alarm_source = "";
+      }
+
+      const char *request_template_parameters[] = {alarm_source, DEVICE_NAME, SERVER_IP_ADDRESS, NULL};
       char *request = set_string_parameters(ALARM_GET_REQUEST_TEMPLATE, request_template_parameters);
 
       #ifdef ALLOW_USE_PRINTF
@@ -630,6 +648,10 @@ static void event_processing_task() {
 }
 
 void app_main(void) {
+   #ifdef ALLOW_USE_PRINTF
+   printf("\nStarting app...\n");
+   #endif
+
    start_100_milliseconds_counter();
 
    pins_config();
