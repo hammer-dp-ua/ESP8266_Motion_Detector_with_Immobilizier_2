@@ -10,6 +10,7 @@
 static const char DEVICE_NAME[] = "Testing3";
 #elif defined(MOTION_SENSOR_WITH_IMMOBILIZER)
 static const char DEVICE_NAME[] = "Motion Sensor with Immobilizer";
+static const char DEVICE_NAME_ENCODED_SPACES[] = "Motion%20Sensor%20with%20Immobilizer";
 #endif
 
 static const char ALARM_SOURCE_1[] = "MOTION_SENSOR_1";

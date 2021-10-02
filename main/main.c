@@ -352,7 +352,7 @@ static void send_alarm_task(void *arg) {
             alarm_source = "";
       }
 
-      const char *request_template_parameters[] = {alarm_source, DEVICE_NAME, SERVER_IP_ADDRESS, NULL};
+      const char *request_template_parameters[] = {alarm_source, DEVICE_NAME_ENCODED_SPACES, SERVER_IP_ADDRESS, NULL};
       char *request = set_string_parameters(ALARM_GET_REQUEST_TEMPLATE, request_template_parameters);
 
       #ifdef ALLOW_USE_PRINTF
